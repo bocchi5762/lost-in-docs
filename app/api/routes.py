@@ -1,6 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Body
 from typing import List
 from core.parser import parse_pdf
+from core.generate import generate_with_rag
 from config.pinecone_config import index
 from config.gemini_config import gemini_client
 import uuid
@@ -53,8 +54,8 @@ async def upload_document(file: UploadFile = File(...)):
 # Query endpoint
 @router.post("/query")
 async def query_rag(query: str = Body(..., embed=True)):
-    # TODO: Retrieve relevant context and generate answer
-    return {"query": query, "answer": "This is a placeholder answer."}
+    answer = await generate_with_rag(query)
+    return {"query": query, "answer": answer}
 
 
 # List documents endpoint
