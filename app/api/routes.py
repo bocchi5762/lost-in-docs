@@ -1,5 +1,8 @@
 from fastapi import APIRouter, UploadFile, File, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import List, Optional
+
 from core.parser import parse_pdf
 from core.generate import generate_with_rag
 from config.pinecone_config import index
@@ -19,6 +22,11 @@ def health_check():
 # Upload document endpoint
 @router.post("/documents/upload")
 async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    # Server-side validation for PDF
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=400, detail="Invalid file type. Only PDFs are allowed."
+        )
     try:
         # 1. Create a document object but don't commit yet
         db_doc = crud.create_document(db, filename=file.filename, chunk_count=0)
@@ -67,11 +75,17 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         )
 
 
+# Pydantic model for the query request
+class QueryRequest(BaseModel):
+    query: str
+    doc_ids: Optional[List[str]] = None
+
+
 # Query endpoint
 @router.post("/query")
-async def query_rag(query: str = Body(..., embed=True)):
-    answer = generate_with_rag(query)
-    return {"query": query, "answer": answer}
+async def query_rag(request: QueryRequest):
+    answer = generate_with_rag(query=request.query, doc_ids=request.doc_ids)
+    return {"query": request.query, "answer": answer}
 
 
 # List documents endpoint

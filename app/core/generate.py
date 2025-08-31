@@ -1,13 +1,16 @@
 from config.gemini_config import gemini_client
 from core.retrieve import retrieve_relevant_docs
+from typing import List, Optional
 
 
-def generate_with_rag(query: str, top_k: int = 5):
+def generate_with_rag(query: str, doc_ids: Optional[List[str]] = None, top_k: int = 5):
     """
     Generates an answer using RAG by retrieving documents and then calling the LLM.
     """
-    # 1. Retrieve relevant documents from Pinecone
-    search_results = retrieve_relevant_docs(query_text=query, top_k=top_k)
+    # 1. Retrieve relevant documents from Pinecone, filtered by doc_ids if provided
+    search_results = retrieve_relevant_docs(
+        query_text=query, doc_ids=doc_ids, top_k=top_k
+    )
 
     # 2. Extract text from results to build the context
     hits = search_results.get("result", {}).get("hits", [])

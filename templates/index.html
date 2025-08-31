@@ -16,7 +16,7 @@
             </div>
             
             <form id="uploadForm" style="display: none;">
-                <input type="file" id="fileInput" name="file">
+                <input type="file" id="fileInput" name="file" accept="application/pdf,.pdf">
             </form>
             <div id="uploadStatus"></div>
 
@@ -57,6 +57,98 @@
         const fileInput = document.getElementById('fileInput');
         const addSourceBtn = document.getElementById('addSourceBtn');
         const sourceList = document.getElementById('sourceList');
+        const selectAllCheckbox = document.getElementById('selectAll');
+
+        // --- Document Loading and Management ---
+
+        // Function to fetch and display documents
+        async function loadDocuments() {
+            sourceList.innerHTML = '<p style="text-align: center; color: #aaa;">Loading documents...</p>';
+            try {
+                const response = await fetch('/documents');
+                const data = await response.json();
+                sourceList.innerHTML = ''; // Clear loading message
+
+                if (response.ok) {
+                    if (data.documents.length === 0) {
+                        sourceList.innerHTML = '<p style="text-align: center; color: #aaa; font-style: italic;">No documents uploaded yet.</p>';
+                    } else {
+                        data.documents.forEach(doc => {
+                            addDocumentToList(doc.filename, doc.doc_id);
+                        });
+                    }
+                } else {
+                    uploadStatus.textContent = `Error loading documents: ${data.detail}`;
+                    sourceList.innerHTML = '<p style="text-align: center; color: #ff6b6b;">Failed to load documents.</p>';
+                }
+            } catch (error) {
+                sourceList.innerHTML = ''; // Clear loading message
+                uploadStatus.textContent = 'Could not connect to the server to load documents.';
+                sourceList.innerHTML = '<p style="text-align: center; color: #ff6b6b;">Connection error.</p>';
+            }
+        }
+
+        // Function to add a single document to the UI list
+        function addDocumentToList(filename, docId) {
+            const sourceItem = document.createElement('div');
+            sourceItem.className = 'source-item';
+            sourceItem.innerHTML = `
+                <span>📄 ${filename}</span>
+                <div class="source-item-controls">
+                    <input type="checkbox" checked data-doc-id="${docId}">
+                    <button class="delete-btn" data-doc-id="${docId}" title="Delete document">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+            // If the list was showing a "no documents" message, clear it
+            if (sourceList.querySelector('p')) {
+                sourceList.innerHTML = '';
+            }
+            sourceList.appendChild(sourceItem);
+        }
+
+        // Event listener for the "Select All" checkbox
+        selectAllCheckbox.addEventListener('change', (e) => {
+            const checkboxes = sourceList.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = e.target.checked;
+            });
+        });
+
+        // --- Event Delegation for Delete ---
+        sourceList.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('delete-btn')) {
+                const docId = e.target.dataset.docId;
+                const sourceItem = e.target.closest('.source-item');
+                const filename = sourceItem.querySelector('span').textContent.trim().substring(2);
+
+                if (confirm(`Are you sure you want to delete "${filename}"?`)) {
+                    try {
+                        const response = await fetch(`/documents/${docId}`, {
+                            method: 'DELETE',
+                        });
+                        const result = await response.json();
+                        if (response.ok) {
+                            sourceItem.remove();
+                            uploadStatus.textContent = result.message;
+                            // If the list is now empty, show the placeholder text
+                            if (sourceList.children.length === 0) {
+                                sourceList.innerHTML = '<p style="text-align: center; color: #aaa; font-style: italic;">No documents uploaded yet.</p>';
+                            }
+                        } else {
+                            uploadStatus.textContent = `Error: ${result.detail}`;
+                        }
+                    } catch (error) {
+                        uploadStatus.textContent = 'An error occurred while deleting the document.';
+                    }
+                }
+            }
+        });
+
+        // --- Upload Logic ---
 
         // Trigger file input when "+ Add" button is clicked
         addSourceBtn.addEventListener('click', () => {
@@ -66,6 +158,13 @@
         // Handle file selection and upload
         fileInput.addEventListener('change', () => {
             if (fileInput.files.length > 0) {
+                const file = fileInput.files[0];
+                // Client-side validation for PDF
+                if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+                    uploadStatus.textContent = 'Upload failed: Only PDF files are allowed.';
+                    uploadForm.reset(); // Clear the invalid file selection
+                    return;
+                }
                 uploadForm.dispatchEvent(new Event('submit', { cancelable: true }));
             }
         });
@@ -87,13 +186,7 @@
                 const result = await response.json();
                 if (response.ok) {
                     uploadStatus.textContent = `Successfully uploaded ${filename}.`;
-                    const sourceItem = document.createElement('div');
-                    sourceItem.className = 'source-item';
-                    sourceItem.innerHTML = `
-                        <span>📄 ${filename}</span>
-                        <input type="checkbox" checked data-doc-id="${result.doc_id}">
-                    `;
-                    sourceList.appendChild(sourceItem);
+                    addDocumentToList(result.filename, result.doc_id);
                 } else {
                     uploadStatus.textContent = `Upload failed: ${result.detail}`;
                 }
@@ -103,6 +196,8 @@
             uploadForm.reset(); // Reset form to allow re-uploading the same file
         });
 
+        // --- Query Logic ---
+
         const queryForm = document.getElementById('queryForm');
         const queryInput = document.getElementById('queryInput');
         const answerEl = document.getElementById('answer');
@@ -111,8 +206,14 @@
         queryForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const query = queryInput.value;
+            if (!query.trim()) return;
+
             answerEl.textContent = '';
             spinner.style.display = 'block';
+
+            // Find all selected document IDs
+            const selectedDocs = document.querySelectorAll('#sourceList input[type="checkbox"]:checked');
+            const docIds = Array.from(selectedDocs).map(cb => cb.dataset.docId);
 
             try {
                 const response = await fetch('/query', {
@@ -120,7 +221,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ query: query }),
+                    body: JSON.stringify({ query: query, doc_ids: docIds }),
                 });
                 const result = await response.json();
                 if (response.ok) {
@@ -134,6 +235,9 @@
                 spinner.style.display = 'none';
             }
         });
+
+        // Load documents when the page is ready
+        document.addEventListener('DOMContentLoaded', loadDocuments);
     </script>
 </body>
 </html>
