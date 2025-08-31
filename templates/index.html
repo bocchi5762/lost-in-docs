@@ -8,41 +8,76 @@
 </head>
 <body>
     <div class="container">
-        <h1>Lost in Docs</h1>
-        <p>Ask a question about your uploaded documents.</p>
-        
-        <div class="upload-section">
-            <h2>Upload Document</h2>
-            <form id="uploadForm">
-                <input type="file" id="fileInput" name="file" required>
-                <button type="submit">Upload</button>
+        <aside class="sidebar">
+            <h2>Sources</h2>
+            <div class="source-actions">
+                <button id="addSourceBtn">+ Add</button>
+                <button class="discover-btn">Discover</button>
+            </div>
+            
+            <form id="uploadForm" style="display: none;">
+                <input type="file" id="fileInput" name="file">
             </form>
             <div id="uploadStatus"></div>
-        </div>
 
-        <div class="query-section">
-            <h2>Query Documents</h2>
-            <form id="queryForm">
-                <textarea id="queryInput" name="query" placeholder="Enter your question here..." required></textarea>
-                <button type="submit">Ask</button>
-            </form>
-            <div id="queryResult" class="result-box">
-                <div id="spinner" class="spinner" style="display: none;"></div>
-                <p id="answer"></p>
+            <div class="source-list-header">
+                <span>Select all sources</span>
+                <input type="checkbox" id="selectAll" checked>
             </div>
-        </div>
+            <div id="sourceList" class="source-list">
+                <!-- Uploaded documents will be listed here -->
+            </div>
+        </aside>
+
+        <main class="chat-container">
+            <div class="chat-header">
+                <h1>Lost in Docs</h1>
+                <p>Ask a question about your uploaded documents.</p>
+            </div>
+            
+            <div class="chat-window">
+                <div id="queryResult" class="result-box">
+                    <div id="spinner" class="spinner" style="display: none;"></div>
+                    <p id="answer"></p>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <form id="queryForm">
+                    <textarea id="queryInput" name="query" placeholder="Start typing..." required></textarea>
+                    <button type="submit">▲</button>
+                </form>
+            </div>
+        </main>
     </div>
 
     <script>
         const uploadForm = document.getElementById('uploadForm');
         const uploadStatus = document.getElementById('uploadStatus');
         const fileInput = document.getElementById('fileInput');
+        const addSourceBtn = document.getElementById('addSourceBtn');
+        const sourceList = document.getElementById('sourceList');
+
+        // Trigger file input when "+ Add" button is clicked
+        addSourceBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Handle file selection and upload
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                uploadForm.dispatchEvent(new Event('submit', { cancelable: true }));
+            }
+        });
 
         uploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (fileInput.files.length === 0) return;
+
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
-            uploadStatus.textContent = 'Uploading...';
+            const filename = fileInput.files[0].name;
+            uploadStatus.textContent = `Uploading ${filename}...`;
 
             try {
                 const response = await fetch('/documents/upload', {
@@ -51,18 +86,25 @@
                 });
                 const result = await response.json();
                 if (response.ok) {
-                    uploadStatus.textContent = `Successfully uploaded ${result.filename}. Doc ID: ${result.doc_id}`;
+                    uploadStatus.textContent = `Successfully uploaded ${filename}.`;
+                    const sourceItem = document.createElement('div');
+                    sourceItem.className = 'source-item';
+                    sourceItem.innerHTML = `
+                        <span>📄 ${filename}</span>
+                        <input type="checkbox" checked data-doc-id="${result.doc_id}">
+                    `;
+                    sourceList.appendChild(sourceItem);
                 } else {
                     uploadStatus.textContent = `Upload failed: ${result.detail}`;
                 }
             } catch (error) {
                 uploadStatus.textContent = 'An error occurred during upload.';
             }
+            uploadForm.reset(); // Reset form to allow re-uploading the same file
         });
 
         const queryForm = document.getElementById('queryForm');
         const queryInput = document.getElementById('queryInput');
-        const queryResult = document.getElementById('queryResult');
         const answerEl = document.getElementById('answer');
         const spinner = document.getElementById('spinner');
 
