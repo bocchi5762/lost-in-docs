@@ -2,12 +2,12 @@ from config.gemini_config import gemini_client
 from core.retrieve import retrieve_relevant_docs
 
 
-async def generate_with_rag(query: str, top_k: int = 5):
+def generate_with_rag(query: str, top_k: int = 5):
     """
     Generates an answer using RAG by retrieving documents and then calling the LLM.
     """
     # 1. Retrieve relevant documents from Pinecone
-    search_results = await retrieve_relevant_docs(query_text=query, top_k=top_k)
+    search_results = retrieve_relevant_docs(query_text=query, top_k=top_k)
 
     # 2. Extract text from results to build the context
     hits = search_results.get("result", {}).get("hits", [])
@@ -37,6 +37,6 @@ async def generate_with_rag(query: str, top_k: int = 5):
 
     # 4. Generate the answer using the LLM
     response = gemini_client.models.generate_content(
-        model="gemini-2.0-flash", messages=[{"role": "user", "content": prompt}]
+        model="gemini-2.0-flash", contents=prompt
     )
-    return response.choices[0].message.content
+    return response.text
