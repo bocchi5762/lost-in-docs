@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lost in Docs</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Lost in Docs</h1>
+        <p>Ask a question about your uploaded documents.</p>
+        
+        <div class="upload-section">
+            <h2>Upload Document</h2>
+            <form id="uploadForm">
+                <input type="file" id="fileInput" name="file" required>
+                <button type="submit">Upload</button>
+            </form>
+            <div id="uploadStatus"></div>
+        </div>
+
+        <div class="query-section">
+            <h2>Query Documents</h2>
+            <form id="queryForm">
+                <textarea id="queryInput" name="query" placeholder="Enter your question here..." required></textarea>
+                <button type="submit">Ask</button>
+            </form>
+            <div id="queryResult" class="result-box">
+                <div id="spinner" class="spinner" style="display: none;"></div>
+                <p id="answer"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            uploadStatus.textContent = 'Uploading...';
+
+            try {
+                const response = await fetch('/documents/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    uploadStatus.textContent = `Successfully uploaded ${result.filename}. Doc ID: ${result.doc_id}`;
+                } else {
+                    uploadStatus.textContent = `Upload failed: ${result.detail}`;
+                }
+            } catch (error) {
+                uploadStatus.textContent = 'An error occurred during upload.';
+            }
+        });
+
+        const queryForm = document.getElementById('queryForm');
+        const queryInput = document.getElementById('queryInput');
+        const queryResult = document.getElementById('queryResult');
+        const answerEl = document.getElementById('answer');
+        const spinner = document.getElementById('spinner');
+
+        queryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = queryInput.value;
+            answerEl.textContent = '';
+            spinner.style.display = 'block';
+
+            try {
+                const response = await fetch('/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query }),
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    answerEl.textContent = result.answer;
+                } else {
+                    answerEl.textContent = `Error: ${result.detail}`;
+                }
+            } catch (error) {
+                answerEl.textContent = 'An error occurred while fetching the answer.';
+            } finally {
+                spinner.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -3,7 +3,6 @@ from typing import List
 from core.parser import parse_pdf
 from core.generate import generate_with_rag
 from config.pinecone_config import index
-from config.gemini_config import gemini_client
 import uuid
 
 
