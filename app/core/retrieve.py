@@ -5,7 +5,7 @@ from typing import List, Optional
 def retrieve_relevant_docs(
     query_text: str,
     doc_ids: Optional[List[str]] = None,
-    top_k: int = 5,
+    top_k: int = 10,
     namespace: str = "__default__",
 ):
     """

@@ -103,11 +103,12 @@ async def delete_document(doc_id: str, db: Session = Depends(get_db)):
     if not db_document:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # 2. Delete vectors from Pinecone
-    await index.delete(filter={"doc_id": doc_id}, namespace="__default__")
+    # 2. Delete vectors from Pinecone (this is a synchronous call)
+    index.delete(filter={"doc_id": doc_id}, namespace="__default__")
 
     # 3. Delete the document record from the database
     crud.delete_document(db, doc_id=doc_id)
+    db.commit()  # Commit the transaction to save the deletion
 
     return {
         "status": "success",
